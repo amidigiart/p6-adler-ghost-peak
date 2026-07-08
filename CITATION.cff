@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "Ghost Sensitivity Peaks in Adaptive Phase-Coupled Systems: A Disguised Adler Bifurcation and a Calibration Rule for Coupling Floors"
+authors:
+  - family-names: "Roșca"
+    given-names: "Mihai"
+    affiliation: "Independent researcher, Brăila, Romania"
+version: 0.1.0
+date-released: 2026-07-09
+license: MIT
+keywords:
+  - Kuramoto model
+  - Adler equation
+  - SNIC bifurcation
+  - critical slowing down
+  - adaptive coupling
+  - AI alignment
+  - reproducibility
