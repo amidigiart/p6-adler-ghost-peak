@@ -116,7 +116,7 @@ The rule β_min ≥ m·Δω_max/K_ext with m = 1.5 therefore guarantees τ_relax
 
 ## 7. Reproducibility and code availability
 
-Two independent implementations produce all headline numbers: the original (pairwise-sum Kuramoto, legacy seeding, seeds 1–3) and a reimplementation written from the equations alone (vectorized mean field, independent Kalman, seeds 10–12). Scripts, exact parameters, and both raw outputs accompany this manuscript [code repository / Zenodo DOI — to be added]. The original calibration script reproduces its archived output bit-for-bit under Python 3.14 / NumPy 2.5.
+Two independent implementations produce all headline numbers: the original (pairwise-sum Kuramoto, legacy seeding, seeds 1–3) and a reimplementation written from the equations alone (vectorized mean field, independent Kalman, seeds 10–12). Scripts, exact parameters, and both raw outputs accompany this manuscript: code repository https://github.com/amidigiart/p6-adler-ghost-peak, archived at https://doi.org/10.5281/zenodo.21269201. The original calibration script reproduces its archived output bit-for-bit under Python 3.14 / NumPy 2.5.
 
 ## AI-assisted research disclosure
 

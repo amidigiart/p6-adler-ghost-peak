@@ -4,6 +4,8 @@
 
 Mihai Roșca · Independent researcher, Brăila, Romania · 2026
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21269201.svg)](https://doi.org/10.5281/zenodo.21269201)
+
 ---
 
 ## The story in five lines
@@ -52,7 +54,7 @@ This work was developed in iterative sessions with multiple AI systems used as d
 
 ## Citation
 
-See [`CITATION.cff`](CITATION.cff). Zenodo DOI: *to be added on first release.*
+See [`CITATION.cff`](CITATION.cff). Archived release: [doi.org/10.5281/zenodo.21269201](https://doi.org/10.5281/zenodo.21269201).
 
 ## License
 

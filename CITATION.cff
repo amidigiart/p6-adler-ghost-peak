@@ -7,6 +7,8 @@ authors:
     affiliation: "Independent researcher, Brăila, Romania"
 version: 0.1.0
 date-released: 2026-07-09
+doi: 10.5281/zenodo.21269201
+repository-code: "https://github.com/amidigiart/p6-adler-ghost-peak"
 license: MIT
 keywords:
   - Kuramoto model
