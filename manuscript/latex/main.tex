@@ -1,0 +1,424 @@
+\ifdefined\XeTeXrevision\else\ifdefined\pdfoutput\pdfoutput=1\fi\fi
+\documentclass[11pt]{article}
+\ifdefined\XeTeXrevision\PassOptionsToPackage{xetex}{hyperref}\fi
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[margin=1.1in]{geometry}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\newcommand{\Keff}{K_{\mathrm{eff}}}
+\newcommand{\bmin}{\beta_{\min}}
+\newcommand{\dw}{\Delta\omega}
+\newcommand{\taurelax}{\tau_{\mathrm{relax}}}
+
+\title{Ghost Sensitivity Peaks in Adaptive Phase-Coupled Systems:\\
+A Disguised Adler Bifurcation and a Calibration Rule for Coupling Floors}
+\author{Mihai Ro\c{s}ca\\
+\small Independent researcher, Br\u{a}ila, Romania\\
+\small ORCID: \href{https://orcid.org/0009-0001-1422-6209}{0009-0001-1422-6209} \quad
+\small \texttt{mihairosca1982@gmail.com}}
+\date{July 2026 --- draft v0.1}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study a Kuramoto system of $N$ internal oscillators coupled to an external
+reference (``human intent'') through a noisy estimate and an adaptive coupling
+weight $\beta$ governed by a coherence index (RSI). During calibration of a
+coupling floor $\bmin$ --- introduced to prevent the adaptive loop from
+self-isolating at high internal coherence --- the system's measured sensitivity
+to genuine reference changes exhibited an unexpected non-monotonic peak at
+$\bmin \approx 0.15$, reproduced across seven noise levels. Two intuitive
+explanations (forced harmonic resonance; critical damping of the feedback loop)
+were tested directly and rejected, one after identifying a fabricated data
+column in an externally proposed analysis. The true mechanism is a
+saddle-node-on-invariant-circle (SNIC) phase-locking bifurcation of Adler type
+in the mean-field reduction: near the locking threshold $\Keff = \dw$, critical
+slowing down makes fixed-window transient measurements register their deepest
+dips, producing a \emph{ghost peak} that tracks the observation protocol rather
+than any resonance of the dynamics. The scaling law
+$\taurelax = (\Keff^2 - \dw^2)^{-1/2}$ is confirmed on the isolated Adler
+equation (measured exponents $-0.4957$ and $-0.5009$ in two independent
+implementations) and on the full 30-oscillator system (measured-to-predicted
+ratios 0.985--0.999). All quantitative claims were reproduced by an independent
+reimplementation with different seeds, RNG, and integration scheme. We derive a
+calibration rule for coupling floors, $\bmin \ge m\,\dw_{\max}/K_{\mathrm{ext}}$
+with $m(\tau_{\mathrm{target}}) = \sqrt{1 + (\dw_{\max}\tau_{\mathrm{target}})^{-2}}$,
+and discuss a general methodological warning: benchmarks of adaptive alignment
+mechanisms that use fixed observation windows can manufacture spurious optima
+near bifurcations.
+\end{abstract}
+
+\section{Introduction}
+
+Adaptive coupling schemes --- systems that adjust how strongly they follow an
+external reference based on their own estimate of coherence --- arise in AI
+alignment proposals \cite{miyato2025}, robot swarms, and power-grid control. A
+recurring design element is a \emph{coupling floor}: a minimum weight below
+which the follow-the-reference term is never allowed to fall, guarding against
+a failure mode in which a self-confident system stops listening precisely
+because it is coherent.
+
+This paper documents a case study in calibrating such a floor. The phenomenon
+that motivated it looked, at first, like a discovery: sensitivity to genuine
+reference changes peaked at an intermediate floor value instead of increasing
+monotonically, consistently across noise levels. We show that the peak is not
+a resonance, not a critical-damping effect, and not a property of the adaptive
+rule at all. It is the shadow of a textbook SNIC bifurcation
+\cite{adler1946,strogatzbook,ermentrout1986} cast onto a fixed observation
+window by critical slowing down --- a \emph{ghost peak}.
+
+Contributions:
+\begin{enumerate}
+\item \textbf{Mechanism identification.} The mean-field reduction of an
+  adaptively coupled Kuramoto system with a coupling floor is an Adler
+  equation; the empirical sensitivity peak is explained completely by critical
+  slowing down near its locking threshold (Section~\ref{sec:results}).
+\item \textbf{Quantitative verification at two levels.} The
+  $\tau \sim (\Keff - \dw)^{-1/2}$ divergence is confirmed on the isolated
+  Adler equation and on the full system, with ratios 0.985--0.999
+  (Fig.~\ref{fig:scaling}), including an independent reimplementation with
+  different seeds and integrator.
+\item \textbf{A calibration rule with a derived margin.}
+  $\bmin \ge m\,\dw_{\max}/K_{\mathrm{ext}}$, where the safety margin $m$
+  follows from a recovery-time requirement:
+  $m(\tau_{\mathrm{target}}) = \sqrt{1+(\dw_{\max}\tau_{\mathrm{target}})^{-2}}$
+  (Section~\ref{sec:calibration}).
+\item \textbf{A methodological warning.} Fixed-window sensitivity benchmarks
+  near bifurcations produce spurious optima. Two plausible-sounding
+  alternative explanations failed direct testing; one arrived with an
+  algebraically derived (not measured) data column, which the verification
+  protocol caught (Section~\ref{sec:rejected}).
+\end{enumerate}
+
+We are explicit about what this work is not: it is a nonlinear-dynamics case
+study on a small model ($N=30$) motivated by AI-alignment questions, not
+evidence about production-scale alignment methods (Section~\ref{sec:limitations}).
+
+\section{Model}\label{sec:model}
+
+$N$ internal phase oscillators $\theta_i$ with natural frequencies $\omega_i$
+couple internally (Kuramoto) and to an estimate of an external reference phase
+$\theta_h$:
+\begin{equation}\label{eq:model}
+\frac{d\theta_i}{dt} = \omega_i
+ + \alpha\,\frac{K_{\mathrm{int}}}{N}\sum_j \sin(\theta_j-\theta_i)
+ + \beta\,K_{\mathrm{ext}}\sin(\hat\theta_h-\theta_i).
+\end{equation}
+The reference is observed only through noisy proxies
+$z(t) = \theta_h(t) + \xi(t)$, $\xi \sim \mathcal{N}(0,\sigma^2)$, filtered by
+a constant-velocity Kalman filter to produce $\hat\theta_h$. Coherence is
+monitored by
+\begin{equation}\label{eq:coherence}
+\Phi_{\mathrm{int}} = \bigl|\langle e^{i\theta_j}\rangle\bigr|, \qquad
+\Phi_{\mathrm{ext}} = \tfrac{1}{2}\bigl(1+\cos(\bar\theta-\hat\theta_h)\bigr), \qquad
+\Phi = \alpha\,\Phi_{\mathrm{int}} + \beta\,\Phi_{\mathrm{ext}},
+\end{equation}
+where $\bar\theta = \arg\langle e^{i\theta_j}\rangle$. (An earlier draft of the
+framework used $\Phi_{\mathrm{ext}} = |e^{i(\bar\theta-\hat\theta_h)}|$, which
+is identically 1; the degeneracy was found by running the simulation, not by
+inspection.) The Resonance Stability Index RSI is a 50-step moving average of
+$\Phi$, and the adaptive weights are
+\begin{equation}\label{eq:adaptive}
+\beta = \max(1-\mathrm{RSI},\,\bmin), \qquad \alpha = 1-\beta.
+\end{equation}
+Equation~\eqref{eq:adaptive} implements the design intent ``open toward the
+reference when unstable''; $\bmin$ is the coupling floor whose calibration this
+paper concerns. Figure~\ref{fig:system} shows the architecture.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\linewidth]{fig1_system.pdf}
+\caption{Architecture. $N$ internal Kuramoto oscillators; an external reference
+observed through noisy proxies and a Kalman filter; adaptive weights
+$\alpha,\beta$ from the RSI loop with floor $\bmin$.}
+\label{fig:system}
+\end{figure}
+
+\paragraph{Mean-field reduction.} When the internal population is strongly
+synchronized ($\Phi_{\mathrm{int}} \approx 1$), the group behaves as one
+effective oscillator, and the phase difference $\psi = \bar\theta - \theta_h$
+obeys the Adler equation \cite{adler1946}
+\begin{equation}\label{eq:adler}
+\frac{d\psi}{dt} = -\dw - \Keff\sin\psi, \qquad \Keff = \beta\,K_{\mathrm{ext}},
+\end{equation}
+with $\dw$ the internal--reference frequency mismatch. For $\Keff > |\dw|$
+there is a stable lock $\psi^* = -\arcsin(\dw/\Keff)$ with relaxation time
+\begin{equation}\label{eq:tau}
+\taurelax = \bigl(\Keff^2 - \dw^2\bigr)^{-1/2};
+\end{equation}
+for $\Keff < |\dw|$ the phase slips with period
+$T_{\mathrm{slip}} = 2\pi\,(\dw^2-\Keff^2)^{-1/2}$. Both diverge at
+$\Keff = \dw$ --- a SNIC bifurcation with critical slowing down
+\cite{strogatzbook,ermentrout1986} (Fig.~\ref{fig:bifurcation}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.62\linewidth]{fig2_bifurcation.pdf}
+\caption{Adler locking diagram. Stable lock $\psi^* = -\arcsin(\dw/\Keff)$
+(solid) and unstable branch (dashed) merge in a SNIC bifurcation at
+$\Keff = \dw$; no fixed point exists in the shaded slipping region.}
+\label{fig:bifurcation}
+\end{figure}
+
+\section{Methods}\label{sec:methods}
+
+\paragraph{Simulation protocol (calibration experiment).} $N=30$,
+$\omega_i \sim \mathcal{N}(1.0,\,0.05)$, $dt=0.02$, $T=3000$ steps,
+$K_{\mathrm{int}}=1.2$, $K_{\mathrm{ext}}=1.5$, Euler integration. The
+reference frequency $\omega_h$ switches $1.0 \to 1.3$ at $t=15$
+($\dw_1 = 0.3$) and $1.3 \to 0.9$ at $t=35$ ($\dw_2 = 0.4$). Kalman:
+$Q = \mathrm{diag}(10^{-4},10^{-3})$, $R = \max(\sigma^2, 10^{-4})$. Grid:
+$\bmin \in \{0, 0.02, 0.05, 0.08, 0.10, 0.15, 0.20, 0.30\}$ $\times$
+$\sigma \in \{0.1, 0.25, 0.5, 1.0, 1.5, 2.0, 2.5\}$, seeds $\{1,2,3\}$.
+
+\paragraph{Sensitivity metric (formal definition).} With switch times
+$t_1, t_2$ and a fixed window $T_w = 250$ steps (5\,s):
+\begin{equation}\label{eq:metric}
+S(\bmin,\sigma) = \frac{1}{2}\sum_{k=1}^{2}
+\Bigl[\,1 - \min_{t\in[t_k,\,t_k+T_w]} \Phi_{\mathrm{ext}}(t)\Bigr].
+\end{equation}
+$S$ is a \emph{transient} quantity by construction; steady-state
+$\Phi_{\mathrm{ext}}$ returns to $\approx 0.99$ in all locked regimes.
+\textbf{Jitter} is the standard deviation of $d\bar\theta/dt$ over a
+pre-switch stationary segment (steps 100--700), quantifying noise transmission
+to the group phase.
+
+\paragraph{Scaling measurements.} $\taurelax$ is measured (i) on
+Eq.~\eqref{eq:adler} directly (RK4, $dt=10^{-3}$), from the asymptotic slope of
+$\ln|\psi-\psi^*|$, for $\Keff/\dw - 1 \in [10^{-3},10^{-1}]$; and (ii) on the
+full system (RK4, $dt=5\times10^{-3}$, fixed $\beta$, spread
+$\sigma_\omega = 0.01$) by applying a 0.2\,rad phase kick to the reference
+after settling and fitting the exponential return of $\psi$. Two measurement
+bugs found and fixed during this step are documented in
+Appendix~\ref{app:record} (phase-wrapping of $\psi$; sign convention of $\dw$)
+--- before the fixes, the full-system check appeared to fail by a factor 4--14.
+
+\paragraph{Independent reproduction.} All headline numbers were re-derived by
+a second implementation written without access to the original code
+(vectorized mean-field formulation instead of pairwise sums, independently
+written Kalman filter, a different RNG, seeds $\{10,11,12\}$). Where the two
+implementations disagree is stated explicitly in Results.
+
+\section{Results}\label{sec:results}
+
+\subsection{The phenomenon: a non-monotonic sensitivity peak}
+
+$S(\bmin)$ rises from $\approx 0.29$ at $\bmin=0$ to a maximum of 0.57--0.68 at
+$\bmin=0.15$, then falls to $\approx 0.12$--$0.36$ by $\bmin=0.30$,
+consistently across all seven noise levels and in both implementations
+(Fig.~\ref{fig:ghost}). Naively, more guaranteed coupling should mean more
+sensitivity; the peak demands a mechanism.
+
+\subsection{Two plausible explanations, tested and rejected}\label{sec:rejected}
+
+\paragraph{Forced harmonic resonance.} Hypothesis: the RSI averaging window
+(50 steps) resonates with the switching cadence. Test: periodic forcing at
+four periods (10--80 steps). Result: response amplitude decreases
+monotonically with $\bmin$ at every period --- no peak. Rejected.
+
+\paragraph{Critical damping of the RSI--$\beta$ loop.} Hypothesis: the peak
+marks a critically damped regime of the feedback loop. The supporting table
+supplied with this hypothesis contained a ``steady-state response'' column
+that direct measurement exposed as algebraically derived from the transient
+column ($\approx 1 - \text{transient}$) rather than measured: actual
+steady-state $\Phi_{\mathrm{ext}}$ is $\approx 0.99$ for \emph{all} $\bmin$.
+Rejected; the episode is retained here as part of the verification record.
+
+\subsection{The mechanism: a disguised Adler bifurcation}
+
+The two switching events have thresholds
+$\beta_{\mathrm{thr},1} = \dw_1/K_{\mathrm{ext}} = 0.20$ and
+$\beta_{\mathrm{thr},2} = \dw_2/K_{\mathrm{ext}} \approx 0.267$
+(Eq.~\eqref{eq:adler}). Below both thresholds the system slips persistently;
+far above both it relocks so fast that a 5\,s window barely registers a dip.
+Near threshold, critical slowing down (Eq.~\eqref{eq:tau}) makes transients
+longer than the window --- which therefore records its deepest minima
+\emph{near but not at} threshold. The measured peak ($\bmin \approx 0.12$--$0.15$,
+just below $\beta_{\mathrm{thr},1}$, with the RSI--$\beta$ loop supplying
+transient coupling above the floor) is the fixed window's shadow of the
+bifurcation, not a property of the adaptive rule. The peak location is
+protocol-dependent by construction --- hence \emph{ghost peak}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.7\linewidth]{fig4_ghost_peak.pdf}
+\caption{The ghost peak. Transient sensitivity (Eq.~\eqref{eq:metric}) vs
+$\bmin$ at $\sigma=0.25$: original implementation (seeds 1--3) and independent
+reimplementation (seeds 10--12; error bars $= \pm 1$ std over seeds). Dashed
+lines: Adler thresholds of the two switching events. The peak sits below
+threshold, in the critical-slowing region --- its location tracks the
+measurement protocol, not a resonance.}
+\label{fig:ghost}
+\end{figure}
+
+\subsection{Quantitative verification}
+
+\begin{itemize}
+\item \textbf{Locking threshold (full system):} persistent slipping below,
+  definitive locking above; empirical transition at $\bmin \approx 0.20$--$0.25$
+  vs analytic 0.20, the offset explained by the RSI--$\beta$ loop raising
+  $\beta$ above the floor when coherence drops.
+\item \textbf{Scaling exponent (isolated Adler):} $-0.5009$ (original) and
+  $-0.4957$ (independent reimplementation) vs $-0.5$ analytic;
+  $T_{\mathrm{slip}}$ measured/predicted $= 1.0000$ across
+  $\Keff/\dw \in \{0.5, 0.8, 0.95, 0.99\}$.
+\item \textbf{Transfer to the full system ($N=30$):} measured/predicted $\tau$
+  ratios 0.9847--0.9965 (original, larger $\omega$-spread) and 0.9968--0.9990
+  (reimplementation, $\sigma_\omega = 0.01$) across
+  $\beta \in \{0.35, 0.4, 0.5, 0.7, 1.0\}$ (Fig.~\ref{fig:scaling}). The
+  residual deviation shrinks with the internal frequency spread, consistent
+  with the mean-field idealization.
+\item \textbf{Ghost peak reproduction:} the $\bmin = 0.15$ peak reproduces at
+  all seven noise levels under the independent reimplementation (peak
+  $S = 0.55$--$0.67$ vs neighbors 0.25--0.43), with different seeds and RNG
+  (Fig.~\ref{fig:ghost}).
+\end{itemize}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\linewidth]{fig3_scaling.pdf}
+\caption{Critical slowing down. Relaxation time vs distance from threshold,
+log-log: isolated Adler equation (circles), full $N=30$ system (squares),
+analytic curve (line), $-1/2$ slope guide (dotted). Both systems collapse onto
+Eq.~\eqref{eq:tau}.}
+\label{fig:scaling}
+\end{figure}
+
+\subsection{Calibration rule with a derived margin}\label{sec:calibration}
+
+Requiring the locked system to recover within a target time,
+$\taurelax \le \tau_{\mathrm{target}}$, and writing $\Keff = m\,\dw_{\max}$,
+Eq.~\eqref{eq:tau} gives
+\begin{equation}\label{eq:margin}
+m(\tau_{\mathrm{target}}) = \sqrt{1 + \bigl(\dw_{\max}\,\tau_{\mathrm{target}}\bigr)^{-2}},
+\qquad\text{equivalently}\qquad
+\taurelax \le \bigl[\dw_{\max}\sqrt{m^2-1}\bigr]^{-1}.
+\end{equation}
+The rule $\bmin \ge m\,\dw_{\max}/K_{\mathrm{ext}}$ with $m=1.5$ therefore
+guarantees $\taurelax \le 0.894/\dw_{\max}$ --- recovery within one
+characteristic mismatch time. A numerical check on Eq.~\eqref{eq:adler} gives
+guaranteed vs measured $\tau$ agreement of 0.996--0.999 for
+$m \in \{1.2, 1.5, 2, 3\}$. This replaces both the naive ``$\bmin$ that scored
+best on the grid'' (0.15 --- inside the critical-slowing region, hence
+fragile) and any fixed universal constant: the floor must be set from the
+anticipated frequency mismatch and the required recovery time, quantities an
+implementer can estimate.
+
+\section{Discussion}\label{sec:discussion}
+
+\paragraph{For benchmark design.} Any evaluation of an adaptive
+coupling/alignment mechanism that (i) measures transient responses (ii) in
+fixed windows (iii) while sweeping a parameter that moves the system across a
+locking threshold will manufacture an interior optimum. The optimum tracks the
+observation protocol --- window length, event magnitudes $\dw_k$ --- not the
+mechanism. This is the transient counterpart of using critical slowing down as
+an early-warning signal \cite{scheffer2009}: the same divergence that provides
+warning signals also corrupts fixed-window benchmarks.
+
+\paragraph{For adaptive alignment schemes.} The episode illustrates a
+structural risk in coherence-gated coupling (Eq.~\eqref{eq:adaptive}): the
+regime in which the system most needs external correction (large $\dw$) is
+exactly where slow relaxation makes corrections hardest to observe. Recovery
+time after a large perturbation deserves treatment as a first-class metric,
+separate from steady-state alignment quality.
+
+\paragraph{On the verification record.} Two attractive explanations failed
+direct tests; one external contribution contained fabricated data; two bugs in
+our own verification code initially masqueraded as a 4--14$\times$ violation
+of the mean-field prediction. We retain these in Appendix~\ref{app:record}
+because the paper's reliability claim rests on the process, not on the
+elegance of the final formula.
+
+\section{Limitations}\label{sec:limitations}
+
+\begin{itemize}
+\item Results characterize a small phase-oscillator model ($N=30$) with
+  synthetic reference signals. No claim is made about neural-network training
+  dynamics or production alignment methods (RLHF/DPO); the connection is
+  motivational, not demonstrated.
+\item The proxies-to-phase pipeline (Kalman with fixed $R$) is idealized;
+  whether real human-interaction signals admit a useful phase representation
+  is an open problem and the framework's main unvalidated assumption.
+\item The ghost-peak location depends on protocol parameters ($T_w$, $\dw_k$);
+  we characterize the mechanism, not a universal constant.
+\item Euler integration with $dt=0.02$ for the calibration experiment (RK4 for
+  scaling measurements); the peak's robustness to integrator choice is
+  confirmed only indirectly through the independent reimplementation.
+\end{itemize}
+
+\section{Reproducibility and code availability}
+
+Two independent implementations produce all headline numbers: the original
+(pairwise-sum Kuramoto, legacy seeding, seeds 1--3) and a reimplementation
+written from the equations alone (vectorized mean field, independent Kalman,
+seeds 10--12). Scripts, exact parameters, and both raw outputs accompany this
+manuscript: code repository
+\url{https://github.com/amidigiart/p6-adler-ghost-peak}, archived at
+\href{https://doi.org/10.5281/zenodo.21269201}{doi:10.5281/zenodo.21269201}.
+The original calibration script reproduces its archived output bit-for-bit
+under Python 3.14 / NumPy 2.5.
+
+\section*{AI-assisted research disclosure}
+
+The research was conducted by the author in iterative sessions with multiple
+AI systems used as drafting, critique, and verification instruments, with
+executed code as the arbiter for every quantitative claim. Two AI-proposed
+explanations were rejected by direct testing, and one AI-supplied table was
+identified as containing fabricated values (Section~\ref{sec:rejected}). The
+independent reimplementation and cross-validation were performed by an AI
+system (Claude, Anthropic) in a separate session without access to the
+original code. All results were verified by execution on the author's
+hardware.
+
+\appendix
+\section{Verification record (bugs and rejected analyses)}\label{app:record}
+
+\paragraph{A.1 Degenerate coherence formula.} The original external-coherence
+definition $|e^{i(\bar\theta-\hat\theta_h)}| \equiv 1$ cannot detect
+misalignment; found by simulation (RSI pinned at 0.999 across intent changes),
+fixed to Eq.~\eqref{eq:coherence}.
+
+\paragraph{A.2 Phase-wrapping bug.} $\psi$ computed as (wrapped $\bar\theta$)
+$-$ (unwrapped $\theta_h$) inflated full-system $\tau$ ratios to
+4.3--14.5$\times$; fixed by wrapping the difference.
+
+\paragraph{A.3 Sign convention.} The implemented coupling direction yields
+$d\psi/dt = -\dw - \Keff\sin\psi$; the initially assumed $+\dw$ made
+predictions incomparable.
+
+\paragraph{A.4 Fabricated data column.} An externally supplied ``empirical''
+table for the critical-damping hypothesis contained a steady-state column
+derived algebraically from the transient column; direct measurement
+(steady-state $\Phi_{\mathrm{ext}} \approx 0.99\ \forall \bmin$) exposed it.
+
+\paragraph{A.5 Rejected calibrator.} An externally supplied $\bmin$ calibrator
+produced hardcoded recommendations that failed cross-validation against full
+simulations (e.g., predicted $\Phi_{\mathrm{ext}} = 0.66$ vs measured 0.998 at
+$\sigma = 0.05$).
+
+\begin{thebibliography}{9}
+\bibitem{adler1946} R.~Adler, ``A study of locking phenomena in oscillators,''
+  \emph{Proc. IRE} \textbf{34}, 351--357 (1946).
+\bibitem{kuramoto1984} Y.~Kuramoto, \emph{Chemical Oscillations, Waves, and
+  Turbulence} (Springer, 1984).
+\bibitem{strogatz2000} S.~H. Strogatz, ``From Kuramoto to Crawford: exploring
+  the onset of synchronization in populations of coupled oscillators,''
+  \emph{Physica D} \textbf{143}, 1--20 (2000).
+\bibitem{strogatzbook} S.~H. Strogatz, \emph{Nonlinear Dynamics and Chaos}
+  (Addison-Wesley, 1994), Ch.~4.
+\bibitem{ermentrout1986} G.~B. Ermentrout and N.~Kopell, ``Parabolic bursting
+  in an excitable system coupled with a slow oscillation,'' \emph{SIAM J.
+  Appl. Math.} \textbf{46}, 233--253 (1986).
+\bibitem{scheffer2009} M.~Scheffer \emph{et al.}, ``Early-warning signals for
+  critical transitions,'' \emph{Nature} \textbf{461}, 53--59 (2009).
+\bibitem{miyato2025} T.~Miyato, S.~L\"owe, A.~Geiger, and M.~Welling,
+  ``Artificial Kuramoto Oscillatory Neurons,'' \emph{ICLR} (2025).
+\bibitem{pikovsky2001} A.~Pikovsky, M.~Rosenblum, and J.~Kurths,
+  \emph{Synchronization: A Universal Concept in Nonlinear Sciences}
+  (Cambridge Univ. Press, 2001).
+\end{thebibliography}
+
+\end{document}
