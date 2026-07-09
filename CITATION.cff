@@ -5,6 +5,7 @@ authors:
   - family-names: "Roșca"
     given-names: "Mihai"
     affiliation: "Independent researcher, Brăila, Romania"
+    orcid: "https://orcid.org/0009-0001-1422-6209"
 version: 0.1.0
 date-released: 2026-07-09
 doi: 10.5281/zenodo.21269201

@@ -1,7 +1,7 @@
 # Ghost Sensitivity Peaks in Adaptive Phase-Coupled Systems: A Disguised Adler Bifurcation and a Calibration Rule for Coupling Floors
 
 **Mihai Roșca**¹
-¹ Independent researcher, Brăila, Romania
+¹ Independent researcher, Brăila, Romania · ORCID: [0009-0001-1422-6209](https://orcid.org/0009-0001-1422-6209)
 
 **Draft v0.1 — 8 July 2026 — target: arXiv nlin.AO (cross-list cs.LG)**
 
